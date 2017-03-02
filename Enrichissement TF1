@@ -1,0 +1,113 @@
+***************** -- ENRICHISSEMENT DES DONNEES TF1 AVEC LES DONNEES DE LA DCRM **************************************************
+
+
+-- CREATION DE LA TABLE TF1:
+
+CREATE MULTISET TABLE db_esp_moad.TF1 ,NO FALLBACK ,
+     NO BEFORE JOURNAL,
+     NO AFTER JOURNAL,
+     CHECKSUM = DEFAULT,
+     DEFAULT MERGEBLOCKRATIO
+     (
+      COMPTE_ID VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      COMPTE_MSO_ID VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      EMAIL VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      EMAIL_VALIDITE_COMMUNICATION VARCHAR(255) CHARACTER SET LATIN NOT CASESPECIFIC,
+      OPTIN_COMMERCIAL_EMAIL INTEGER,
+      TEL_PORTABLE VARCHAR(255) CHARACTER SET LATIN NOT CASESPECIFIC,
+      TEL_VALIDITE_COMMUNICATION INTEGER,
+      OPTIN_TELEPHONE INTEGER)
+PRIMARY INDEX ( COMPTE_ID );
+
+****************************************** *********************************************
+
+-- CREATION DE LA TABLE PARC_DCRM_SOFIALYS:
+
+CREATE MULTISET TABLE db_esp_moad.PARC_DCRM_SOFIALYS ,NO FALLBACK ,
+     NO BEFORE JOURNAL,
+     NO AFTER JOURNAL,
+     CHECKSUM = DEFAULT,
+     DEFAULT MERGEBLOCKRATIO
+     (
+	  NUMR_TELP VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC ,
+      FLAG_ABONNEE_SFR INTEGER NOT NULL DEFAULT 0  COMPRESS (0 ,1),
+      FLAG_OPT_IN integer DEFAULT 0  COMPRESS (0 ,1),
+      GENRE INTEGER,
+      AGE DATE FORMAT 'YYYY-MM-DD',
+      AGE_NON_RENSEIGNE DATE FORMAT 'YYYY-MM-DD',
+      CSP VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      DEPARTEMENT VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      COD_POST VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      IRIS_ID INTEGER,
+      SMARTPHONE INTEGER,
+      TAC_OS VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      Marque_Mobile VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC,
+      Modele_mobile VARCHAR(50) CHARACTER SET LATIN NOT CASESPECIFIC)
+PRIMARY INDEX ( NUMR_TELP );
+
+**************************************************************************************************************
+
+-- Insertion dans la table DB_ESP_MOAD.PARC_DCRM_SOFIALYS:
+
+INSERT INTO DB_ESP_MOAD.PARC_DCRM_SOFIALYS 
+	SELECT DISTINCT
+	  PARC.NUMR_TELP ,
+	  case when PARC.NOMB_PARC=1 then 1 else 0 end AS FLAG_ABONNEE_SFR,
+	  case when HOI.OPT_IN='start' then 1 else if HOI.OPT_IN='STOP'THEN 0 end as FLAG_OPT_IN ,    // A VOIR **************** A TESTER avec HOI.TYP_OPT_IN = 'TIERS'  ************************ 
+	  PARC.COD_SEXE ,
+	  PARC.DAT_NAIS ,
+	  null, --remplacer par -2
+	  null, -- remplacer parc -2
+	  PARC.VILL_ADRS_NORM ,
+	  PARC.COD_POST ,
+	  PARC.IRIS_ID,
+	  PARC.TAC_FIN_MOIS_ID,   
+	  TAC.OS,
+	  TAC.LIBL_MARQ,
+	  TAC.LIBL_MODL
+from
+	DB_LAB_CRM_V.VFA_PARC_A_DATE AS PARC
+inner join 
+	DB_ESP_MOAD.TF1 AS TF1
+ON 
+	TF1.TEL_PORTABLE=Parc.NUMR_TELP
+INNER JOIN 
+	DB_LAB_CRM_T.TDI_TAC_DENRM TAC  
+ON
+	PARC.TAC_FIN_MOIS_ID =tac.TAC_ID
+INNER JOIN
+     VC_S_NOMINATIF.PERSONNE PERS
+ON 
+	PARC.ACCS_ID=PERS.PERS_ID
+inner join 
+	VC_B_CLIENT.HIST_OPT_IN AS HOI
+ON 
+	PERS.IDNT_PERS = HOI.IDNT_EXTR
+WHERE  
+	HOI.DAT_SUPP IS NULL AND HOI.TYP_OPT_IN = 'TIERS'  --- TABLE OPTIN TIERS AVEC LES CLIENTS ACTIFS EN COURS  
+and 
+	nomb_parc=1;
+		
+	
+**********************************************************************************************************************
+	-- Export des clients de la table DB_esp_moad.parc_dcrm_sofialys
+	
+SELECT * FROM DB_esp_moad.parc_dcrm_sofialys AS A  
+left outer join 
+	
+	db_esp_moad.tf1 AS B
+on
+	 A.NUMR_TELP=B.TEL_PORTABLE;
+	
+************************************************
+		
+	-- Export des clients de toute la table db_esp_moad.parc_dcrm_sofialys en utilisant
+		
+		SEL * FROM DB_esp_moad.parc_dcrm_sofialys AS A  LEFT /full OUTER join db_esp_moad.tf1 AS B
+    on
+	
+	A.NUMR_TELP=B.TEL_PORTABLE    ( and B.tel_Portable is null );
+
+	
+**************************************************************
+
